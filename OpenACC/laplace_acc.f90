@@ -40,6 +40,7 @@ program acc
 
       call initialize(temperature_last)
 
+      !$acc data copy(temperature), copy(temperature_last)
       !do until error is minimal or until maximum steps
       do while ( dt > max_temp_error .and. iteration <= max_iterations)
          !$acc kernels
@@ -62,12 +63,13 @@ program acc
          !$acc end kernels
          !periodically print test values
          if( mod(iteration,100).eq.0 ) then
+            !$acc update host(temperature)
             call track_progress(temperature, iteration)
          endif
 
          iteration = iteration+1
-
       enddo
+      !$acc end data
 
       call cpu_time(stop_time)
 

@@ -56,69 +56,71 @@ int main(int argc, char *argv[]) {
     initialize();                   // initialize Temp_last including boundary conditions
 
     // do until error is minimal or until max steps
-    while ( dt > MAX_TEMP_ERROR && iteration <= max_iterations ) {
-#pragama acc kernels
-        // main calculation: average my four neighbors
-        for(i = 1; i <= ROWS; i++) {
-            for(j = 1; j <= COLUMNS; j++) {
-                Temperature[i][j] = 0.25 * (Temperature_last[i+1][j] + Temperature_last[i-1][j] +
-                                            Temperature_last[i][j+1] + Temperature_last[i][j-1]);
-            }
-        }
+#pragma acc data copy(Temperature), copy(Temperature_last)
+    {
+      while ( dt > MAX_TEMP_ERROR && iteration <= max_iterations ) {
+#pragma acc kernels
+	// main calculation: average my four neighbors
+	for(i = 1; i <= ROWS; i++) {
+	  for(j = 1; j <= COLUMNS; j++) {
+	    Temperature[i][j] = 0.25 * (Temperature_last[i+1][j] + Temperature_last[i-1][j] +
+					Temperature_last[i][j+1] + Temperature_last[i][j-1]);
+	  }
+	}
         
-        dt = 0.0; // reset largest temperature change
+	dt = 0.0; // reset largest temperature change
 
-#pragama acc kernels
-        // copy grid to old grid for next iteration and find latest dt
-        for(i = 1; i <= ROWS; i++){
-            for(j = 1; j <= COLUMNS; j++){
-	      dt = fmax( fabs(Temperature[i][j]-Temperature_last[i][j]), dt);
-	      Temperature_last[i][j] = Temperature[i][j];
-            }
-        }
+#pragma acc kernels
+	// copy grid to old grid for next iteration and find latest dt
+	for(i = 1; i <= ROWS; i++){
+	  for(j = 1; j <= COLUMNS; j++){
+	    dt = fmax( fabs(Temperature[i][j]-Temperature_last[i][j]), dt);
+	    Temperature_last[i][j] = Temperature[i][j];
+	  }
+	}
 
-        // periodically print test values
-        if((iteration % 100) == 0) {
- 	    track_progress(iteration);
-        }
+	// periodically print test values
+	if((iteration % 100) == 0) {
+#pragma acc update host(Temperature)
+	  track_progress(iteration);
+	}
 
 	iteration++;
+      }
     }
-
     gettimeofday(&stop_time,NULL);
     timersub(&stop_time, &start_time, &elapsed_time); // Unix time subtract routine
 
     printf("\nMax error at iteration %d was %f\n", iteration-1, dt);
     printf("Total time was %f seconds.\n", elapsed_time.tv_sec+elapsed_time.tv_usec/1000000.0);
-
 }
 
 
-// initialize plate and boundary conditions
-// Temp_last is used to to start first iteration
+    // initialize plate and boundary conditions
+    // Temp_last is used to to start first iteration
 void initialize(){
 
-    int i,j;
+  int i,j;
 
-    for(i = 0; i <= ROWS+1; i++){
-        for (j = 0; j <= COLUMNS+1; j++){
-            Temperature_last[i][j] = 0.0;
-        }
+  for(i = 0; i <= ROWS+1; i++){
+    for (j = 0; j <= COLUMNS+1; j++){
+      Temperature_last[i][j] = 0.0;
     }
+  }
 
-    // these boundary conditions never change throughout run
+  // these boundary conditions never change throughout run
 
-    // set left side to 0 and right to a linear increase
-    for(i = 0; i <= ROWS+1; i++) {
-        Temperature_last[i][0] = 0.0;
-        Temperature_last[i][COLUMNS+1] = (100.0/ROWS)*i;
-    }
+  // set left side to 0 and right to a linear increase
+  for(i = 0; i <= ROWS+1; i++) {
+    Temperature_last[i][0] = 0.0;
+    Temperature_last[i][COLUMNS+1] = (100.0/ROWS)*i;
+  }
     
-    // set top to 0 and bottom to linear increase
-    for(j = 0; j <= COLUMNS+1; j++) {
-        Temperature_last[0][j] = 0.0;
-        Temperature_last[ROWS+1][j] = (100.0/COLUMNS)*j;
-    }
+  // set top to 0 and bottom to linear increase
+  for(j = 0; j <= COLUMNS+1; j++) {
+    Temperature_last[0][j] = 0.0;
+    Temperature_last[ROWS+1][j] = (100.0/COLUMNS)*j;
+  }
 }
 
 
